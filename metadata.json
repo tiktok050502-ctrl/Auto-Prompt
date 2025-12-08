@@ -1,0 +1,5 @@
+{
+  "name": "Key To App",
+  "description": "An application that takes a user's idea, analyzes it, breaks it down into scenes, and generates optimized prompts for each scene to create AI-powered videos using Google's Veo 3.1 model.",
+  "requestFramePermissions": []
+}

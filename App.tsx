@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, PropsWithChildren } from 'react';
 import MainScreen from './components/MainScreen';
 
@@ -115,24 +114,21 @@ const AuthGuard = ({ children }: PropsWithChildren) => {
   };
 
   // --- REAL-TIME EXPIRY CHECK (NEW) ---
-  // Kiểm tra liên tục mỗi 60 giây. Nếu quá hạn -> Đá ra ngoài.
   useEffect(() => {
     if (!isUnlocked) return;
 
     const checkExpiryNow = () => {
        const key = localStorage.getItem('my_app_license_online');
-       if (!key) return; // Nếu mất key thì thôi (sẽ bị đá ở lần reload sau)
+       if (!key) return;
 
-       // Parse Key để lấy hạn sử dụng
        try {
           const parts = key.split('-');
           const expHex = parts[1];
           if (expHex !== 'LIFETIME') {
             const expTimestamp = parseInt(expHex, 16);
             if (!isNaN(expTimestamp) && Date.now() > expTimestamp) {
-               // HẾT HẠN!
                alert('Thời hạn sử dụng Key đã kết thúc. Vui lòng liên hệ Admin để gia hạn.');
-               handleLogout(); // Đăng xuất ngay
+               handleLogout();
             }
           }
        } catch (e) {
@@ -140,7 +136,7 @@ const AuthGuard = ({ children }: PropsWithChildren) => {
        }
     };
 
-    const interval = setInterval(checkExpiryNow, 60000); // Check mỗi 60s
+    const interval = setInterval(checkExpiryNow, 60000);
     return () => clearInterval(interval);
   }, [isUnlocked]);
 
@@ -192,18 +188,18 @@ const AuthGuard = ({ children }: PropsWithChildren) => {
     setIsLoading(false);
   };
 
-  if (isLoading) return <div className="min-h-screen bg-white flex items-center justify-center text-gray-800 p-4 font-medium">Đang kiểm tra...</div>;
+  if (isLoading) return <div className="min-h-screen bg-white flex items-center justify-center text-gray-800 p-4 font-medium animate-pulse">Đang kiểm tra bản quyền...</div>;
 
   if (isUnlocked) return (
     <>
       <div className="fixed top-4 right-4 z-[9999] flex items-center gap-3">
-        <div className="flex items-center gap-2 bg-white/90 text-gray-800 px-4 py-2 rounded-full border border-gray-200 shadow-lg backdrop-blur-sm text-sm">
-           <span>⏳ Còn lại:</span>
-           <span className="font-bold text-green-600">{getKeyDisplayInfo()}</span>
+        <div className="flex items-center gap-2 bg-white/80 backdrop-blur-md text-gray-800 px-4 py-2 rounded-full border border-gray-200 shadow-lg text-sm font-medium">
+           <span className="text-gray-500">Hạn dùng:</span>
+           <span className="font-bold text-indigo-600">{getKeyDisplayInfo()}</span>
         </div>
         <button 
           onClick={handleLogout}
-          className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-red-500/30 transition-all transform hover:scale-105 active:scale-95"
+          className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-red-500/30 transition-all transform hover:scale-105 active:scale-95"
         >
           Đổi Key
         </button>
@@ -214,25 +210,32 @@ const AuthGuard = ({ children }: PropsWithChildren) => {
   );
 
   return (
-    <div className="fixed inset-0 bg-gray-50 flex items-center justify-center p-4 z-50 font-sans">
-      <div className="bg-white p-8 rounded-3xl w-full max-w-md text-center shadow-2xl border border-gray-100">
-        <h2 className="text-3xl font-extrabold mb-2 text-gray-800 tracking-tight">Kích Hoạt App</h2>
-        <p className="text-gray-500 mb-8 text-sm">Vui lòng nhập License Key để bắt đầu sáng tạo.</p>
-        <div className="relative mb-6">
+    <div className="fixed inset-0 bg-white flex items-center justify-center p-4 z-50 font-sans">
+      <div className="bg-white p-10 rounded-3xl w-full max-w-md text-center shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-gray-100 relative overflow-hidden">
+        {/* Decorative background blur */}
+        <div className="absolute -top-20 -left-20 w-40 h-40 bg-purple-200 rounded-full blur-3xl opacity-30"></div>
+        <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-blue-200 rounded-full blur-3xl opacity-30"></div>
+        
+        <h2 className="text-3xl font-extrabold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 tracking-tight relative z-10">
+            Kích Hoạt Ứng Dụng
+        </h2>
+        <p className="text-gray-500 mb-8 text-base relative z-10">Nhập mã bản quyền để bắt đầu sáng tạo.</p>
+        
+        <div className="relative mb-6 z-10">
             <input 
             value={keyInput}
             onChange={(e) => setKeyInput(e.target.value.toUpperCase())}
-            className="w-full border-2 border-gray-200 p-4 rounded-xl text-center font-mono uppercase text-gray-900 text-lg bg-gray-50 focus:bg-white focus:border-blue-500 focus:outline-none transition-all shadow-sm focus:shadow-blue-200"
+            className="w-full border-2 border-gray-100 p-4 rounded-2xl text-center font-mono uppercase text-gray-900 text-lg bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none transition-all shadow-inner"
             placeholder="SK-XXXX-XXXX-XXXX"
             />
         </div>
         
-        {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-6 text-sm font-medium border border-red-100 animate-pulse">{error}</div>}
+        {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl mb-6 text-sm font-bold border border-red-100 animate-pulse relative z-10">{error}</div>}
         
         <button 
           onClick={handleUnlock} 
           disabled={isLoading}
-          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] active:scale-95 shadow-xl shadow-blue-500/30"
+          className="w-full relative z-10 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:via-purple-500 hover:to-pink-500 text-white py-4 rounded-2xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] active:scale-95 shadow-xl shadow-indigo-500/30"
         >
           {isLoading ? 'Đang xác thực...' : 'Mở Khóa Ngay'}
         </button>
@@ -244,7 +247,7 @@ const AuthGuard = ({ children }: PropsWithChildren) => {
 export default function App() {
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+      <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-purple-100 selection:text-purple-900">
          <MainScreen />
       </div>
     </AuthGuard>

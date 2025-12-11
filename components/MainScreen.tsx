@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { generateScript, extendScript, validateApiKey } from '../services/geminiService';
 import { Script, Scene, VideoGenerationOptions } from '../types';
@@ -18,9 +17,9 @@ const MainScreen = () => {
         idea: '',
         promptCount: '',
         videoStyle: 'Cinematic',
-        aspectRatio: '16:9', // Default hardcoded to 16:9
+        aspectRatio: '16:9',
         dialogueLanguage: 'Không Có',
-        promptType: 'default', // Default value
+        promptType: 'default',
     });
     const [scenes, setScenes] = useState<Scene[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -29,7 +28,6 @@ const MainScreen = () => {
     
     // UI Feedback States
     const [isAllPromptsCopied, setIsAllPromptsCopied] = useState(false);
-    const [isAllScriptsCopied, setIsAllScriptsCopied] = useState(false);
     const [isAllWishkCopied, setIsAllWishkCopied] = useState(false);
 
     // Extension States
@@ -85,14 +83,6 @@ const MainScreen = () => {
         }
     };
 
-    const handleResetKey = () => {
-        setIsKeyVerified(false);
-        setShowKeyInput(true);
-        setKeyError('');
-        setGoogleApiKey('');
-        localStorage.removeItem('google_ai_key');
-    };
-
     const handleGenerateScript = async () => {
         if (!isKeyVerified || !googleApiKey) {
             setError('Vui lòng nhập và KIỂM TRA (Check) Google AI Studio Key trước.');
@@ -103,8 +93,8 @@ const MainScreen = () => {
             setError('Vui lòng nhập ý tưởng video.');
             return;
         }
-        if (options.promptCount === '') {
-            setError('Vui lòng nhập số lượng prompt.');
+        if (options.promptCount === '' || Number(options.promptCount) <= 0) {
+            setError('Vui lòng nhập số lượng prompt hợp lệ (lớn hơn 0).');
             return;
         }
         setIsLoading(true);
@@ -114,7 +104,6 @@ const MainScreen = () => {
         setIsExpanding(false); // Reset expansion UI
 
         try {
-            // NOTE: We explicitly pass the validated `googleApiKey` here
             const script: Script = await generateScript(options, googleApiKey, (msg) => {
                 setProgressMessage(msg);
             });
@@ -153,7 +142,6 @@ const MainScreen = () => {
         setError(null);
         
         try {
-            // NOTE: We explicitly pass the validated `googleApiKey` here
             const newScenes = await extendScript(
                 lastScene,
                 extendIdea,
@@ -179,22 +167,13 @@ const MainScreen = () => {
             setIsExtendingLoading(false);
         }
     };
-    
+
     const handleCopyAllPrompts = () => {
         if (scenes.length === 0) return;
         const allPrompts = scenes.map(scene => scene.veo_prompt).join('\n\n');
         navigator.clipboard.writeText(allPrompts).then(() => {
             setIsAllPromptsCopied(true);
             setTimeout(() => setIsAllPromptsCopied(false), 2000);
-        });
-    };
-
-    const handleCopyAllScripts = () => {
-        if (scenes.length === 0) return;
-        const allScripts = scenes.map(scene => scene.script_description).join('\n\n');
-        navigator.clipboard.writeText(allScripts).then(() => {
-            setIsAllScriptsCopied(true);
-            setTimeout(() => setIsAllScriptsCopied(false), 2000);
         });
     };
 
@@ -208,16 +187,13 @@ const MainScreen = () => {
     };
 
     return (
-        <main className="w-full min-h-screen p-4 md:p-6 relative">
+        <main className="w-full min-h-screen p-4 md:p-6 relative bg-white">
             {/* Centered Header Layout */}
             <header className="relative flex flex-col items-center justify-center mb-10 mt-8 gap-4">
                 <div className="text-center z-10 w-full max-w-4xl px-4">
-                    <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600 mb-2 drop-shadow-sm">
-                        Tool Tạo Prompt
+                    <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600 mb-2 drop-shadow-sm pb-2">
+                        Tool Tạo Prompt Video AI
                     </h1>
-                    <p className="text-lg text-gray-600 font-medium">
-                        Biến ý tưởng thành video AI đẳng cấp chỉ trong tích tắc.
-                    </p>
                 </div>
             </header>
 
@@ -226,11 +202,11 @@ const MainScreen = () => {
                 
                 {/* Left Side: Input Form */}
                 <div className="w-full lg:w-1/2 lg:sticky lg:top-6">
-                    <div className="bg-white p-6 md:p-8 rounded-3xl shadow-2xl border border-gray-100">
+                    <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-2xl border border-gray-100 ring-1 ring-gray-100/50">
                         <div className="space-y-6">
                             
                             {/* GOOGLE AI STUDIO API KEY SECTION */}
-                            <div className={`p-5 rounded-2xl border transition-all duration-300 shadow-sm ${isKeyVerified ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-indigo-100'}`}>
+                            <div className={`p-5 rounded-2xl border transition-all duration-300 shadow-sm ${isKeyVerified ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
                                 <label className="flex items-center text-sm font-bold text-gray-700 mb-3 tracking-wide uppercase">
                                     <KeyIcon className="w-5 h-5 mr-2 text-indigo-500" />
                                     Google AI Studio API Key
@@ -299,7 +275,7 @@ const MainScreen = () => {
                                 <textarea
                                     id="idea"
                                     rows={4}
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white transition-all shadow-inner text-base"
+                                    className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all shadow-sm text-base placeholder-gray-400"
                                     placeholder="Ví dụ: Một cô gái Việt Nam mặc áo dài đi dạo ở phố cổ Hội An..."
                                     value={options.idea}
                                     onChange={(e) => setOptions({ ...options, idea: e.target.value })}
@@ -309,26 +285,28 @@ const MainScreen = () => {
                             {/* Grid controls */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label htmlFor="promptCount" className="block text-sm font-bold text-gray-700 mb-2">Số lượng prompt</label>
+                                    <label htmlFor="promptCount" className="block text-sm font-bold text-gray-700 mb-2">
+                                        Số lượng Prompt <span className="text-red-500">*</span>
+                                    </label>
                                     <input
                                         id="promptCount"
                                         type="number"
-                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm"
+                                        className="w-full bg-white border border-gray-200 rounded-xl p-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm"
                                         value={options.promptCount}
                                         onChange={(e) => {
                                             const value = e.target.value;
                                             setOptions({ ...options, promptCount: value === '' ? '' : parseInt(value, 10) });
                                         }}
-                                        min="0"
-                                        placeholder="Ví dụ: 5"
+                                        min="1"
+                                        placeholder="Nhập số lượng (vd: 5, 50, 100...)"
                                     />
+                                    <p className="text-xs text-gray-400 mt-1">Hệ thống sẽ tạo đúng số lượng này.</p>
                                 </div>
-                                {/* Removed Aspect Ratio Dropdown */}
                                 <div>
                                     <label htmlFor="videoStyle" className="block text-sm font-bold text-gray-700 mb-2">Phong cách</label>
                                     <select
                                         id="videoStyle"
-                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm cursor-pointer"
+                                        className="w-full bg-white border border-gray-200 rounded-xl p-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm cursor-pointer"
                                         value={options.videoStyle}
                                         onChange={(e) => setOptions({ ...options, videoStyle: e.target.value })}
                                     >
@@ -339,7 +317,7 @@ const MainScreen = () => {
                                     <label htmlFor="dialogueLanguage" className="block text-sm font-bold text-gray-700 mb-2">Hội thoại</label>
                                     <select
                                         id="dialogueLanguage"
-                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm cursor-pointer"
+                                        className="w-full bg-white border border-gray-200 rounded-xl p-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm cursor-pointer"
                                         value={options.dialogueLanguage}
                                         onChange={(e) => setOptions({ ...options, dialogueLanguage: e.target.value })}
                                     >
@@ -353,7 +331,7 @@ const MainScreen = () => {
                                     <label htmlFor="promptType" className="block text-sm font-bold text-gray-700 mb-2">Loại Prompt</label>
                                     <select
                                         id="promptType"
-                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm cursor-pointer"
+                                        className="w-full bg-white border border-gray-200 rounded-xl p-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm cursor-pointer"
                                         value={options.promptType || 'default'}
                                         onChange={(e) => setOptions({ ...options, promptType: e.target.value as any })}
                                     >
@@ -370,7 +348,7 @@ const MainScreen = () => {
                                     className={`w-full flex items-center justify-center px-6 py-4 text-lg font-bold text-white rounded-xl transition-all h-16 shadow-xl ${
                                         !isKeyVerified 
                                         ? 'bg-gray-300 cursor-not-allowed opacity-70 text-gray-500' 
-                                        : 'bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 hover:from-indigo-500 hover:via-violet-500 hover:to-fuchsia-500 shadow-indigo-500/40 hover:shadow-indigo-500/60 transform hover:scale-[1.02] active:scale-95'
+                                        : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:via-purple-500 hover:to-pink-500 shadow-purple-500/40 hover:shadow-purple-500/60 transform hover:scale-[1.02] active:scale-95'
                                     }`}
                                     title={!isKeyVerified ? "Vui lòng nhập và kiểm tra API Key trước" : "Tạo kịch bản"}
                                 >
@@ -380,7 +358,7 @@ const MainScreen = () => {
                                                 <LoadingIcon className="w-6 h-6 mr-3 animate-spin" />
                                                 Đang sáng tạo
                                             </div>
-                                            {progressMessage && <span className="text-xs text-white/80 mt-1 font-normal animate-pulse">{progressMessage}</span>}
+                                            {progressMessage && <span className="text-xs text-white/90 mt-1 font-normal animate-pulse">{progressMessage}</span>}
                                         </div>
                                     ) : (
                                         <>
@@ -399,17 +377,16 @@ const MainScreen = () => {
                 <div className="w-full lg:w-1/2">
                     {scenes.length > 0 ? (
                         <>
-                            <div className="bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-200 sticky top-4 z-20 shadow-xl shadow-gray-200/50 mb-8 flex flex-wrap gap-3 justify-between items-center transition-all">
-                                <div className="flex flex-1 gap-3 min-w-[200px]">
-                                    <button onClick={handleCopyAllScripts} className={`flex-1 px-4 py-3 text-sm font-bold text-white rounded-xl flex items-center justify-center shadow-lg transition-all transform hover:scale-105 active:scale-95 ${isAllScriptsCopied ? 'bg-green-500 shadow-green-500/30' : 'bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 shadow-purple-500/30'}`}>
-                                        {isAllScriptsCopied ? <CheckIcon className="w-5 h-5" /> : <ClipboardIcon className="w-5 h-5 mr-2" />} Kịch bản
-                                    </button>
-                                    <button onClick={handleCopyAllPrompts} className={`flex-1 px-4 py-3 text-sm font-bold text-white rounded-xl flex items-center justify-center shadow-lg transition-all transform hover:scale-105 active:scale-95 ${isAllPromptsCopied ? 'bg-green-500 shadow-green-500/30' : 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 shadow-blue-500/30'}`}>
-                                        {isAllPromptsCopied ? <CheckIcon className="w-5 h-5" /> : <ClipboardIcon className="w-5 h-5 mr-2" />} Prompts
-                                    </button>
-                                    <button onClick={handleCopyAllWishk} className={`flex-1 px-4 py-3 text-sm font-bold text-white rounded-xl flex items-center justify-center shadow-lg transition-all transform hover:scale-105 active:scale-95 ${isAllWishkCopied ? 'bg-green-500 shadow-green-500/30' : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 shadow-amber-500/30'}`}>
-                                        {isAllWishkCopied ? <CheckIcon className="w-5 h-5" /> : <WandIcon className="w-5 h-5 mr-2" />} Wishk
-                                    </button>
+                            <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-gray-200 sticky top-4 z-20 shadow-xl shadow-gray-200/20 mb-8 flex flex-col gap-3 transition-all">
+                                <div className="flex flex-wrap gap-3 w-full justify-between items-center">
+                                    <div className="flex flex-1 gap-3 min-w-[200px]">
+                                        <button onClick={handleCopyAllPrompts} className={`flex-1 px-4 py-3 text-sm font-bold text-white rounded-xl flex items-center justify-center shadow-lg transition-all transform hover:scale-105 active:scale-95 ${isAllPromptsCopied ? 'bg-green-500 shadow-green-500/30' : 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 shadow-blue-500/30'}`}>
+                                            {isAllPromptsCopied ? <CheckIcon className="w-5 h-5" /> : <ClipboardIcon className="w-5 h-5 mr-2" />} Prompts
+                                        </button>
+                                        <button onClick={handleCopyAllWishk} className={`flex-1 px-4 py-3 text-sm font-bold text-white rounded-xl flex items-center justify-center shadow-lg transition-all transform hover:scale-105 active:scale-95 ${isAllWishkCopied ? 'bg-green-500 shadow-green-500/30' : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 shadow-amber-500/30'}`}>
+                                            {isAllWishkCopied ? <CheckIcon className="w-5 h-5" /> : <WandIcon className="w-5 h-5 mr-2" />} Wishk
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -426,13 +403,13 @@ const MainScreen = () => {
                                     {!isExpanding ? (
                                         <button 
                                             onClick={() => setIsExpanding(true)}
-                                            className="w-full py-5 border-2 border-dashed border-indigo-300 rounded-2xl text-indigo-600 font-bold hover:bg-indigo-50 hover:border-indigo-500 transition-all flex items-center justify-center group bg-white shadow-sm hover:shadow-md text-lg"
+                                            className="w-full py-5 border-2 border-dashed border-indigo-200 rounded-2xl text-indigo-500 font-bold hover:bg-indigo-50 hover:border-indigo-400 transition-all flex items-center justify-center group bg-white shadow-sm hover:shadow-md text-lg"
                                         >
                                             <SparklesIcon className="w-6 h-6 mr-3 group-hover:scale-125 transition-transform duration-300" />
                                             Mở rộng Kịch bản (Viết tiếp câu chuyện)
                                         </button>
                                     ) : (
-                                        <div className="bg-white rounded-2xl p-6 md:p-8 border border-indigo-200 shadow-2xl animate-fade-in ring-4 ring-indigo-50">
+                                        <div className="bg-white rounded-[2rem] p-6 md:p-8 border border-indigo-100 shadow-2xl animate-fade-in ring-4 ring-indigo-50/50">
                                             <h3 className="text-xl font-bold text-indigo-600 mb-6 flex items-center">
                                                 <div className="p-2 bg-indigo-100 rounded-lg mr-3">
                                                    <SparklesIcon className="w-6 h-6" />
@@ -446,7 +423,7 @@ const MainScreen = () => {
                                                     value={extendIdea}
                                                     onChange={(e) => setExtendIdea(e.target.value)}
                                                     placeholder="Ví dụ: Nhân vật chính gặp một người lạ mặt, trời bắt đầu mưa to..."
-                                                    className="w-full bg-gray-50 border border-gray-300 rounded-xl p-4 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white min-h-[120px] shadow-inner text-base"
+                                                    className="w-full bg-white border border-gray-200 rounded-xl p-4 text-gray-900 focus:ring-2 focus:ring-indigo-500 min-h-[120px] shadow-inner text-base"
                                                 />
                                             </div>
                                             
@@ -461,8 +438,8 @@ const MainScreen = () => {
                                                     }}
                                                     placeholder="Nhập số lượng cảnh..."
                                                     min="1"
-                                                    max="10"
-                                                    className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white shadow-sm"
+                                                    max="100"
+                                                    className="w-full bg-white border border-gray-200 rounded-xl p-3 text-gray-900 focus:ring-2 focus:ring-indigo-500 shadow-sm"
                                                 />
                                             </div>
                                             
@@ -495,13 +472,13 @@ const MainScreen = () => {
                             </div>
                         </>
                     ) : (
-                        <div className="flex flex-col items-center justify-center min-h-[600px] text-gray-500 border-2 border-dashed border-gray-200 rounded-3xl bg-white/50">
-                            <div className="w-28 h-28 bg-white rounded-full flex items-center justify-center mb-6 shadow-2xl border border-gray-100 ring-4 ring-gray-50">
+                        <div className="flex flex-col items-center justify-center min-h-[600px] text-gray-500 border-2 border-dashed border-gray-200 rounded-[2rem] bg-white">
+                            <div className="w-28 h-28 bg-white rounded-full flex items-center justify-center mb-6 shadow-2xl border border-gray-50 ring-4 ring-gray-50/50">
                                 <PlayIcon className="w-12 h-12 text-indigo-400 ml-2" />
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-700 mb-3">Chưa có kịch bản nào</h3>
+                            <h3 className="text-2xl font-bold text-gray-800 mb-3">Chưa có kịch bản nào</h3>
                             <p className="text-gray-500 max-w-sm text-center text-lg">
-                                Nhập ý tưởng và nhấn <span className="text-indigo-600 font-bold bg-indigo-50 px-2 py-1 rounded">Tạo Kịch bản</span>.
+                                Nhập ý tưởng và nhấn nút <span className="text-indigo-600 font-bold">Tạo Kịch bản</span> để bắt đầu.
                             </p>
                         </div>
                     )}

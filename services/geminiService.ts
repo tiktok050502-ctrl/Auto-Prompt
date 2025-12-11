@@ -1,10 +1,8 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { Script, VideoGenerationOptions, Scene } from '../types';
 
 /**
  * Creates the GoogleGenAI client using the provided API key.
- * This ensures the prompt generation always uses the user's validated key.
  */
 function createAiClient(apiKey: string): GoogleGenAI {
     if (!apiKey) {
@@ -14,73 +12,43 @@ function createAiClient(apiKey: string): GoogleGenAI {
 }
 
 /**
- * Validates the provided API Key with 100% accuracy.
- * 
- * Method: Challenge-Response
- * 1. Requires 'AIza' prefix (Google format).
- * 2. Sends a prompt asking for a specific unique number code.
- * 3. Verifies if the response contains that code.
- * 
- * If the key is invalid/non-existent, Google returns 400/403, throwing an error.
- * If the key is valid, the model processes the request and returns the code.
+ * Validates the provided API Key.
  */
 export async function validateApiKey(apiKey: string): Promise<boolean> {
     const key = apiKey ? apiKey.trim() : "";
-    
-    // 1. Basic Google Key Format Check
     if (!key.startsWith("AIza")) return false;
 
     try {
         const ai = new GoogleGenAI({ apiKey: key });
-        
-        // 2. Challenge Request
-        // We ask for a specific random-like number. 
-        // This prevents cached responses from generic "Hello" prompts.
-        const challengeCode = "918273645"; 
-        
+        // Use a minimal token request to check validity
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: { 
-                parts: [{ text: `Reply with exactly this number: ${challengeCode}` }] 
-            },
+            contents: { parts: [{ text: "a" }] },
         });
-        
-        const text = response.text || "";
-        
-        // 3. strict Verification
-        // If the key works, the AI MUST return the number.
-        if (text.includes(challengeCode)) {
-            return true;
-        }
-        
-        return false;
-
+        return !!response.text;
     } catch (e: any) {
-        // Any error (400 Invalid Key, 403 Permission, etc.) means the key is not usable.
         return false;
     }
 }
+
+// --- HELPER FUNCTIONS FOR DATA CLEANING ---
 
 function cleanAttribute(text: string | undefined | null): string {
     if (!text) return "";
     let t = text.trim();
     if (['không có', 'none', 'n/a', 'null', '', 'unknown'].includes(t.toLowerCase())) return "";
-    t = t.replace(/^[,.\s]+|[,.\s]+$/g, ""); // Remove trailing/leading punctuation
-    t = t.replace(/(\r\n|\n|\r)/gm, " "); // Replace newlines with space
+    t = t.replace(/^[,.\s]+|[,.\s]+$/g, ""); 
+    t = t.replace(/(\r\n|\n|\r)/gm, " "); 
     return t.trim();
 }
 
 function cleanForJson(text: string | undefined | null): string {
     if (!text) return "";
-    // Strictly remove all newlines to ensure single-line JSON values
     return text.replace(/(\r\n|\n|\r)/gm, " ").replace(/\s+/g, " ").trim();
 }
 
-// Map JSON response to internal Scene structure
 function mapJsonToScenes(rawScenes: any[]): Scene[] {
     return rawScenes.map((item: any, index: number) => {
-        // Extract fields based on NEW strict JSON format
-        
         // Time
         const timeStart = item.time?.start ?? 0;
         const timeEnd = item.time?.end ?? 5;
@@ -88,7 +56,7 @@ function mapJsonToScenes(rawScenes: any[]): Scene[] {
 
         // Continuity
         const continuity = cleanAttribute(item.continuity_reference);
-        const continuityLine = continuity ? `Continuity: ${continuity}` : (index > 0 ? 'Continuity: [Missing]' : '');
+        const continuityLine = continuity ? `Continuity: ${continuity}` : '';
 
         // Environment
         const location = cleanAttribute(item.environment?.location);
@@ -103,7 +71,7 @@ function mapJsonToScenes(rawScenes: any[]): Scene[] {
         if (sounds) envParts.push(`Âm thanh: ${sounds}`);
         const envLine = envParts.join(' | ');
 
-        // Characters - Join with semicolon for single line
+        // Characters
         let charLine = '';
         if (item.characters && Array.isArray(item.characters)) {
              const chars = item.characters.map((c: any) => {
@@ -122,12 +90,11 @@ function mapJsonToScenes(rawScenes: any[]): Scene[] {
              if (chars) charLine = `Nhân vật: ${chars}`;
         }
 
-        // Camera
+        // Camera & Style
         const shotType = cleanAttribute(item.camera?.shot_type);
         const camMove = cleanAttribute(item.camera?.movement);
         const cameraLine = (shotType || camMove) ? `Camera: ${shotType} | ${camMove}` : '';
 
-        // Style
         const styleName = cleanAttribute(item.visual_style?.style);
         const lighting = cleanAttribute(item.visual_style?.lighting);
         const styleLine = (styleName || lighting) ? `Visual: ${styleName} | Light: ${lighting}` : '';
@@ -137,7 +104,7 @@ function mapJsonToScenes(rawScenes: any[]): Scene[] {
         const lang = cleanAttribute(item.dialogue?.language);
         const dialogueLine = line ? `Thoại (${lang}): "${line}"` : 'Thoại: Không có';
 
-        // Build a detailed description for the UI - SINGLE LINE, NO SEPARATORS
+        // Description for UI
         const description = [
             `Cảnh ${item.scene || index + 1} (${timeLine})`,
             continuityLine,
@@ -146,9 +113,9 @@ function mapJsonToScenes(rawScenes: any[]): Scene[] {
             cameraLine,
             styleLine,
             dialogueLine
-        ].filter(Boolean).join(' | '); // Join with pipe for continuous single line
+        ].filter(Boolean).join(' | ');
 
-        // Construct the Strict JSON Prompt for output - Sanitize inputs to prevent newlines
+        // Strict JSON Prompt for Veo
         const jsonPrompt = {
             scene: item.scene || index + 1,
             time: item.time || { start: 0, end: 5 },
@@ -165,9 +132,7 @@ function mapJsonToScenes(rawScenes: any[]): Scene[] {
                 appearance: cleanForJson(c.appearance),
                 outfit: cleanForJson(c.outfit),
                 emotion: cleanForJson(c.emotion),
-                actions: {
-                    body_movement: cleanForJson(c.actions?.body_movement)
-                }
+                actions: { body_movement: cleanForJson(c.actions?.body_movement) }
             })),
             camera: {
                 shot_type: cleanForJson(item.camera?.shot_type),
@@ -183,17 +148,164 @@ function mapJsonToScenes(rawScenes: any[]): Scene[] {
             }
         };
 
-        // Ensure Wishk prompt is single line
         let rawWishk = item.wishk_prompt || "";
         rawWishk = cleanForJson(rawWishk);
 
         return {
             scene_number: item.scene || index + 1,
             script_description: description,
-            veo_prompt: JSON.stringify(jsonPrompt), // JSON.stringify(obj) produces a single line string by default
+            veo_prompt: JSON.stringify(jsonPrompt), 
             wishk_prompt: rawWishk 
         };
     });
+}
+
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+// --- CORE GENERATION LOGIC ---
+
+async function generateBatch(
+    ai: GoogleGenAI,
+    options: VideoGenerationOptions,
+    startIndex: number,
+    count: number,
+    previousContext: string | null,
+    storySummary: string | null
+): Promise<{ scenes: any[], summary: string }> {
+
+    const isFirstBatch = startIndex === 1;
+
+    let contextInstructions = "";
+    if (isFirstBatch) {
+        contextInstructions = `
+        TASK: Start the story based on the user's IDEA.
+        Generate scenes ${startIndex} to ${startIndex + count - 1}.
+        Create a "story_summary" in Vietnamese.
+        `;
+    } else {
+        contextInstructions = `
+        TASK: Continue the story seamlessly.
+        CONTEXT:
+        - Story Summary: ${storySummary}
+        - Previous Scene End State: ${previousContext}
+        
+        Generate scenes ${startIndex} to ${startIndex + count - 1}.
+        `;
+    }
+
+    const systemPrompt = `
+You are an elite Video Script & Prompt Engineer.
+${contextInstructions}
+
+RULES:
+1. QUANTITY: OUTPUT EXACTLY ${count} SCENES in the "scenes" array.
+2. LANGUAGE: All descriptive text MUST be in **VIETNAMESE**.
+3. FORMAT: Strictly valid JSON.
+4. NO LINE BREAKS IN 'wishk_prompt'.
+
+USER INPUT:
+- Idea: ${options.idea}
+- Style: ${options.videoStyle}
+- Dialogue: ${options.dialogueLanguage}
+
+REQUIRED JSON STRUCTURE:
+{
+  "story_summary": "Summary in Vietnamese",
+  "scenes": [
+    {
+      "scene": <number>,
+      "time": { "start": 0, "end": 5 },
+      "continuity_reference": "...",
+      "environment": { "location": "...", "weather": "...", "ambient_sound": ["..."] },
+      "characters": [
+        { "name": "...", "appearance": "...", "outfit": "...", "emotion": "...", "actions": { "body_movement": "..." } }
+      ],
+      "camera": { "shot_type": "...", "movement": "..." },
+      "visual_style": { "style": "${options.videoStyle}", "lighting": "..." },
+      "dialogue": { "line": "...", "language": "..." },
+      "wishk_prompt": "Vietnamese prompt. Single line. End with '${options.videoStyle}, cinematic, 8k'"
+    }
+  ]
+}
+`;
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: { parts: [{ text: systemPrompt }] },
+        config: { responseMimeType: 'application/json' }
+    });
+
+    if (!response.text) throw new Error("No response from AI");
+    const json = JSON.parse(response.text);
+
+    return {
+        scenes: json.scenes || [],
+        summary: json.story_summary || ""
+    };
+}
+
+/**
+ * Smart Wrapper: Handles 429 Quota Exceeded by parsing the wait time
+ */
+async function generateBatchWithRetry(
+    ai: GoogleGenAI,
+    options: VideoGenerationOptions,
+    startIndex: number,
+    count: number,
+    previousContext: string | null,
+    storySummary: string | null,
+    onProgress: (msg: string) => void
+): Promise<{ scenes: any[], summary: string }> {
+    const MAX_RETRIES = 10;
+    let attempt = 0;
+
+    while (attempt < MAX_RETRIES) {
+        try {
+            return await generateBatch(ai, options, startIndex, count, previousContext, storySummary);
+        } catch (error: any) {
+            attempt++;
+            
+            // Collect all possible error details
+            const errAny = error as any;
+            const errorDetails = errAny.response ? JSON.stringify(errAny.response) : "";
+            // Combine message, stringified error, and deep response to catch the code/message
+            const errorString = `${errAny.message || ""} ${JSON.stringify(errAny)} ${errorDetails}`;
+            
+            const isQuota = errorString.includes('429') || errorString.includes('quota') || errorString.includes('RESOURCE_EXHAUSTED');
+            const isOverloaded = errorString.includes('503') || errorString.includes('overloaded');
+
+            if ((isQuota || isOverloaded) && attempt < MAX_RETRIES) {
+                let waitTime = 6000; // Default fallback 6s
+
+                // SMART RETRY: Extract "retry in X s" from error message
+                const match = errorString.match(/retry in (\d+(\.\d+)?)s/i);
+                
+                if (match && match[1]) {
+                    // Google is telling us exactly how long to wait.
+                    // We add a healthy 3s buffer to be safe.
+                    const googleWaitTime = parseFloat(match[1]);
+                    waitTime = Math.ceil(googleWaitTime) * 1000 + 3000; 
+                    
+                    onProgress(`Quota API đã đầy. Google yêu cầu chờ ${Math.round(googleWaitTime)}s. Hệ thống sẽ tự động thử lại sau ${Math.round(waitTime/1000)}s...`);
+                } else if (isQuota) {
+                    // Quota exceeded but no time specified?
+                    // Increasing backoff: 20s, 40s, 60s...
+                    waitTime = 20000 * attempt; 
+                    onProgress(`Đã chạm giới hạn Quota. Đang tạm dừng ${waitTime/1000}s để hồi phục... (Lần ${attempt})`);
+                } else {
+                     // 503 Overloaded
+                     waitTime = 5000 * Math.pow(2, attempt - 1);
+                     onProgress(`Server Google đang bận (503). Thử lại sau ${Math.round(waitTime/1000)}s...`);
+                }
+
+                await delay(waitTime);
+                continue; // Retry logic
+            }
+            
+            throw error;
+        }
+    }
+    throw new Error("Không thể kết nối sau nhiều lần thử. Vui lòng kiểm tra Quota tài khoản Google của bạn.");
 }
 
 export async function generateScript(
@@ -201,111 +313,75 @@ export async function generateScript(
     apiKey: string, 
     onProgress: (msg: string) => void
 ): Promise<Script> {
-    // FORCE USE of the User's API Key
     const ai = createAiClient(apiKey);
     
-    onProgress("Đang phân tích ý tưởng và áp dụng quy tắc JSON nghiêm ngặt...");
-
-    const systemPrompt = `
-You are an elite Video Script & Prompt Engineer.
-APP RULES – ABSOLUTELY DO NOT BREAK:
-
-1. 100% USER DRIVEN: Base every scene entirely on user's Idea and Options.
-2. FRAME-BY-FRAME CONTINUITY: Characters/Environment must be identical across scenes.
-3. LANGUAGE: All descriptive text (environment, characters, actions, continuity) MUST be in **VIETNAMESE** to help the user understand the scene.
-4. OUTPUT FORMAT: strictly valid JSON following the schema below.
-5. NO LINE BREAKS IN PROMPTS: The 'wishk_prompt' must be a single, continuous line.
-
-USER INPUT:
-- Idea: ${options.idea}
-- Style: ${options.videoStyle}
-- Prompt Count: ${options.promptCount}
-- Prompt Type: ${options.promptType || 'default'}
-- Dialogue Language: ${options.dialogueLanguage}
-
-CRITICAL INSTRUCTION FOR DIALOGUE:
-- If User chose "Tiếng Việt": "dialogue.line" MUST be in Vietnamese.
-- If User chose "Tiếng Anh": "dialogue.line" MUST be in English.
-- If User chose "Không Có": "dialogue.line" should be empty string.
-
-REQUIRED JSON STRUCTURE (Must match exactly):
-{
-  "story_summary": "Brief summary in Vietnamese",
-  "scenes": [
-    {
-      "scene": <number>,
-      "time": {
-        "start": <number>,
-        "end": <number>
-      },
-      "continuity_reference": "<string - Describe in VIETNAMESE exactly the end state of previous scene (character position, pose, environment). Empty string for scene 1>",
-      "environment": {
-        "location": "<string - detailed location description in VIETNAMESE>",
-        "weather": "<string - in VIETNAMESE>",
-        "ambient_sound": [
-          "<string - in VIETNAMESE>",
-          "<string - in VIETNAMESE>"
-        ]
-      },
-      "characters": [
-        {
-          "name": "<string>",
-          "appearance": "<string - detailed appearance in VIETNAMESE>",
-          "outfit": "<string - detailed outfit in VIETNAMESE>",
-          "emotion": "<string - in VIETNAMESE>",
-          "actions": {
-            "body_movement": "<string - frame-by-frame action description in VIETNAMESE>"
-          }
-        }
-      ],
-      "camera": {
-        "shot_type": "<string>",
-        "movement": "<string>"
-      },
-      "visual_style": {
-        "style": "<${options.videoStyle}>",
-        "lighting": "<string - lighting description in VIETNAMESE>"
-      },
-      "dialogue": {
-        "line": "<string - content of dialogue>",
-        "language": "<string - language name>"
-      },
-      "wishk_prompt": "<string - A highly detailed VIETNAMESE prompt for image generation. It must describe the scene exactly including character appearance, outfit, environment, and lighting. WRITE IN A SINGLE CONTINUOUS LINE. End with '${options.videoStyle}, cinematic, 8k'.>"
-    }
-  ]
-}
-`;
-
-    onProgress("Đang tạo kịch bản frame-by-frame...");
+    // STRATEGY: 
+    // Batch Size 10 + Hard Delay 6s = Max 100 scenes/minute (theoretical) but practically much slower.
+    // This keeps us safely under the 15-20 Requests Per Minute limit.
+    const BATCH_SIZE = 10; 
     
-    try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: { parts: [{ text: systemPrompt }] },
-            config: {
-                responseMimeType: 'application/json'
+    let targetCount = typeof options.promptCount === 'string' 
+        ? parseInt(options.promptCount, 10) 
+        : options.promptCount;
+
+    if (isNaN(targetCount) || targetCount <= 0) targetCount = 5;
+
+    let allRawScenes: any[] = [];
+    let storySummary = "";
+    let previousContext = "";
+
+    const totalBatches = Math.ceil(targetCount / BATCH_SIZE);
+
+    for (let batch = 0; batch < totalBatches; batch++) {
+        const startIndex = (batch * BATCH_SIZE) + 1;
+        const countForThisBatch = Math.min(BATCH_SIZE, targetCount - allRawScenes.length);
+
+        onProgress(`Đang xử lý phần ${batch + 1}/${totalBatches} (Cảnh ${startIndex} - ${startIndex + countForThisBatch - 1})...`);
+
+        try {
+            const result = await generateBatchWithRetry(
+                ai, 
+                options, 
+                startIndex, 
+                countForThisBatch, 
+                previousContext, 
+                storySummary,
+                onProgress
+            );
+
+            if (batch === 0) storySummary = result.summary;
+
+            if (result.scenes && result.scenes.length > 0) {
+                // Correct scene numbers
+                const correctedScenes = result.scenes.map((s, idx) => ({
+                    ...s,
+                    scene: startIndex + idx
+                }));
+                allRawScenes = [...allRawScenes, ...correctedScenes];
+
+                // Context for next batch
+                const lastScene = correctedScenes[correctedScenes.length - 1];
+                const charAction = lastScene.characters?.[0]?.actions?.body_movement || "";
+                const location = lastScene.environment?.location || "";
+                previousContext = `Scene ${lastScene.scene} ended at ${location}. Action: ${charAction}`;
+                
+                // --- HARD DELAY FOR STABILITY ---
+                // Wait 6 seconds between batches to avoid "Burst" rate limiting.
+                if (batch < totalBatches - 1) {
+                    onProgress(`Đang nghỉ 6s để bảo vệ tài khoản Google...`);
+                    await delay(6000); 
+                }
             }
-        });
-
-        if (!response.text) throw new Error("No response from AI");
-
-        const json = JSON.parse(response.text);
-        
-        if (!json.scenes || !Array.isArray(json.scenes)) {
-            throw new Error("Invalid JSON format received");
+        } catch (err: any) {
+            console.error(`Batch ${batch + 1} failed:`, err);
+            throw new Error(`Lỗi ở phần ${batch + 1}: ${err.message}`);
         }
-
-        const scenes = mapJsonToScenes(json.scenes);
-
-        return {
-            story_summary: json.story_summary || "",
-            scenes: scenes
-        };
-
-    } catch (error: any) {
-        console.error("Generate Script Error:", error);
-        throw new Error("Failed to generate script: " + error.message);
     }
+
+    return {
+        story_summary: storySummary,
+        scenes: mapJsonToScenes(allRawScenes)
+    };
 }
 
 export async function extendScript(
@@ -315,11 +391,13 @@ export async function extendScript(
     originalOptions: VideoGenerationOptions,
     apiKey: string
 ): Promise<Scene[]> {
-    // FORCE USE of the User's API Key
     const ai = createAiClient(apiKey);
+    const startNum = lastScene.scene_number + 1;
 
+    // Use a simpler prompt structure for extension
     const prompt = `
-You are extending an existing video script. STRICTLY FOLLOW CONTINUITY RULES.
+You are extending an existing video script. 
+STRICT REQUIREMENT: Generate exactly ${count} NEW scenes.
 
 PREVIOUS SCENE CONTEXT (${lastScene.scene_number}):
 ${lastScene.script_description}
@@ -328,38 +406,24 @@ NEW IDEA TO EXTEND:
 ${extensionIdea}
 
 RULES:
-1. LANGUAGE: All descriptive text MUST be in **VIETNAMESE**.
-2. CONTINUITY IS KING: Scene ${lastScene.scene_number + 1} MUST start exactly where Scene ${lastScene.scene_number} ended.
-3. Maintain exact character appearance (clothes, face) and environment.
-4. Generate ${count} NEW scenes.
-5. Output specific JSON format.
-6. "wishk_prompt" must be in VIETNAMESE and SINGLE LINE.
+1. QUANTITY: OUTPUT EXACTLY ${count} SCENES.
+2. LANGUAGE: All descriptive text MUST be in **VIETNAMESE**.
+3. CONTINUITY IS KING: Scene ${startNum} MUST start exactly where Scene ${lastScene.scene_number} ended.
+4. FORMAT: JSON.
 
-REQUIRED JSON STRUCTURE (Must match exactly):
+REQUIRED JSON STRUCTURE:
 {
   "scenes": [
     {
-      "scene": ${lastScene.scene_number + 1},
+      "scene": ${startNum},
       "time": { "start": 0, "end": 5 },
-      "continuity_reference": "Describe in VIETNAMESE exactly the end state of Scene ${lastScene.scene_number}",
-      "environment": {
-        "location": "Detailed description in VIETNAMESE...",
-        "weather": "In VIETNAMESE...",
-        "ambient_sound": ["In VIETNAMESE..."]
-      },
-      "characters": [
-        {
-          "name": "...",
-          "appearance": "MATCH PREVIOUS SCENE (In VIETNAMESE)",
-          "outfit": "MATCH PREVIOUS SCENE (In VIETNAMESE)",
-          "emotion": "In VIETNAMESE...",
-          "actions": { "body_movement": "In VIETNAMESE..." }
-        }
-      ],
-      "camera": { "shot_type": "...", "movement": "..." },
-      "visual_style": { "style": "...", "lighting": "In VIETNAMESE..." },
-      "dialogue": { "line": "...", "language": "..." },
-      "wishk_prompt": "Detailed VIETNAMESE prompt translating this exact scene. SINGLE LINE. Ending with '${originalOptions.videoStyle}, cinematic, 8k'"
+      "continuity_reference": "...",
+      "environment": { ... },
+      "characters": [ ... ],
+      "camera": { ... },
+      "visual_style": { "style": "${originalOptions.videoStyle}", "lighting": "..." },
+      "dialogue": { ... },
+      "wishk_prompt": "..."
     }
   ]
 }
@@ -374,13 +438,8 @@ REQUIRED JSON STRUCTURE (Must match exactly):
 
         if (!response.text) throw new Error("No response");
         const json = JSON.parse(response.text);
-        
-        // Adjust scene numbers if necessary (though prompt should handle it)
-        const startNum = lastScene.scene_number + 1;
         const mapped = mapJsonToScenes(json.scenes || []);
-        
         return mapped.map((s, i) => ({ ...s, scene_number: startNum + i }));
-
     } catch (error: any) {
         throw new Error("Extension failed: " + error.message);
     }
